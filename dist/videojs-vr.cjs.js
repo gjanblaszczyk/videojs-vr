@@ -52748,6 +52748,12 @@ function (_videojs$EventTarget) {
     _this.foaRenderer = Omnitone.createFOARenderer(audioContext, settings);
 
     _this.foaRenderer.initialize().then(function () {
+      if (audioContext.state === 'suspended') {
+        _this.trigger({
+          type: 'audiocontext-suspended'
+        });
+      }
+
       _this.videoElementSource.connect(_this.foaRenderer.input);
 
       _this.foaRenderer.output.connect(audioContext.destination);
@@ -53510,9 +53516,17 @@ function (_Plugin) {
     }
 
     if (this.options_.enableOmnitone) {
-      this.omniController = new OmnitoneController(AudioContext$1.getContext(), this.getVideoEl_(), this.options_.omnitone);
+      var audiocontext = AudioContext$1.getContext();
+      this.omniController = new OmnitoneController(audiocontext, this.getVideoEl_(), this.options_.omnitone);
+      this.omniController.one('audiocontext-suspended', function () {
+        _this3.player.pause();
+
+        _this3.player.one('playing', function () {
+          audiocontext.resume();
+        });
+      });
       this.omniController.on('omnitone-error', function (event) {
-        videojs.log.error('videojs-vr: omnitone init error: ' + event.error);
+        videojs.log.error('videojs-vr: ' + event.error);
 
         _this3.triggerError_({
           code: 'web-vr-omnitone-init-error',
@@ -53546,6 +53560,7 @@ function (_Plugin) {
 
     if (this.omniController) {
       this.omniController.off('omnitone-error');
+      this.omniController.off('audiocontext-suspended');
       this.omniController.dispose();
       this.omniController = undefined;
     }
